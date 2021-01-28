@@ -6,16 +6,12 @@
 . ../common.ps1
 
 Describe  "Connect to a FortiGate (using HTTP)" {
-    BeforeAll {
-        #Disconnect "default connection"
-        Disconnect-FGT -confirm:$false
-    }
     It "Connect to a FortiGate (using HTTP) and check global variable" {
-        Connect-FGT $ipaddress -Username $login -password $mysecpassword -httpOnly
+        Connect-FGT $ipaddress -Username $login -password $mysecpassword -httpOnly -port $port
         $DefaultFGTConnection | Should -Not -BeNullOrEmpty
         $DefaultFGTConnection.server | Should -Be $ipaddress
         $DefaultFGTConnection.invokeParams | Should -Not -BeNullOrEmpty
-        $DefaultFGTConnection.port | Should -Be "80"
+        $DefaultFGTConnection.port | Should -Be $port
         $DefaultFGTConnection.httpOnly | Should -Be $true
         $DefaultFGTConnection.session | Should -Not -BeNullOrEmpty
         $DefaultFGTConnection.headers | Should -Not -BeNullOrEmpty
@@ -23,22 +19,18 @@ Describe  "Connect to a FortiGate (using HTTP)" {
     }
     It "Disconnect to a FortiGate (using HTTP) and check global variable" {
         Disconnect-FGT -confirm:$false
-        $DefaultFGTConnection | Should be $null
+        $DefaultFGTConnection | Should -Be $null
     }
     #TODO: Connect using wrong login/password
 }
 
 Describe "Connect to a fortigate (using HTTPS)" {
-    BeforeAll {
-        #Disconnect "default connection"
-        #Disconnect-FGT -confirm:$false
-    }
     It "Connect to a FortiGate (using HTTPS and -SkipCertificateCheck) and check global variable" -Skip:($httpOnly) {
-        Connect-FGT $ipaddress -Username $login -password $mysecpassword -SkipCertificateCheck
+        Connect-FGT $ipaddress -Username $login -password $mysecpassword -SkipCertificateCheck -port $port
         $DefaultFGTConnection | Should -Not -BeNullOrEmpty
         $DefaultFGTConnection.server | Should -Be $ipaddress
         $DefaultFGTConnection.invokeParams | Should -Not BeNullOrEmpty
-        $DefaultFGTConnection.port | Should -Be "443"
+        $DefaultFGTConnection.port | Should -Be $port
         $DefaultFGTConnection.httpOnly | Should -Be $false
         $DefaultFGTConnection.session | Should -Not -BeNullOrEmpty
         $DefaultFGTConnection.headers | Should -Not -BeNullOrEmpty
@@ -57,12 +49,12 @@ Describe "Connect to a fortigate (using HTTPS)" {
 
 Describe "Connect to a FortiGate (using multi connection)" {
     It "Connect to a FortiGate (using HTTPS and store on fgt variable)" {
-        $script:fgt = Connect-FGT $ipaddress -Username $login -password $mysecpassword -httpOnly -SkipCertificate -DefaultConnection:$false
+        $script:fgt = Connect-FGT $ipaddress -Username $login -password $mysecpassword -httpOnly -SkipCertificate -DefaultConnection:$false -port $port
         $DefaultFGTConnection | Should -BeNullOrEmpty
         $fgt.session | Should -Not -BeNullOrEmpty
         $fgt.server | Should -Be $ipaddress
         $fgt.invokeParams | Should -Not -BeNullOrEmpty
-        $fgt.port | Should -Be "80"
+        $fgt.port | Should -Be $port
         $fgt.httpOnly | Should -Be $true
         $fgt.session | Should -Not -BeNullOrEmpty
         $fgt.headers | Should -Not -BeNullOrEmpty
@@ -85,6 +77,15 @@ Describe "Connect to a FortiGate (using multi connection)" {
         }
         It "Use Multi connection for call Get Firewall Policy" {
             { Get-FGTFirewallPolicy -connection $fgt } | Should -Not -Throw
+        }
+        It "Use Multi connection for call Get Firewall Proxy Address" {
+            { Get-FGTFirewallProxyAddress -connection $fgt } | Should -Not -Throw
+        }
+        It "Use Multi connection for call Get Firewall Proxy Address Group" {
+            { Get-FGTFirewallProxyAddressGroup -connection $fgt } | Should -Not -Throw
+        }
+        It "Use Multi connection for call Get Firewall Proxy Policy" {
+            { Get-FGTFirewallProxyPolicy -connection $fgt } | Should -Not -Throw
         }
         It "Use Multi connection for call Get Firewall Service Custom" {
             { Get-FGTFirewallServiceCustom -connection $fgt } | Should -Not -Throw
@@ -119,6 +120,12 @@ Describe "Connect to a FortiGate (using multi connection)" {
         It "Use Multi connection for call Get System Virtual WAN Link (SD-WAN)" {
             { Get-FGTSystemVirtualWANLink -connection $fgt } | Should -Not -Throw
         }
+        It "Use Multi connection for call Get System SD-WAN (> 6.4.0)" -skip:($fgt_version -lt "6.4.0") {
+            { Get-FGTSystemSDWAN -connection $fgt } | Should -Not -Throw
+        }
+        It "Use Multi connection for call Get System SD-WAN (< 6.4.0)" -skip:($fgt_version -ge "6.4.0") {
+            { Get-FGTSystemSDWAN -connection $fgt } | Should -Throw "Please use Get-FGTSystemVirtualWANLink, SD-WAN is not available before FortiOS 6.4.x"
+        }
         It "Use Multi connection for call Get System Zone " {
             { Get-FGTSystemZone -connection $fgt } | Should -Not -Throw
         }
@@ -136,6 +143,11 @@ Describe "Connect to a FortiGate (using multi connection)" {
     It "Disconnect to a FortiGate (Multi connection)" {
         Disconnect-FGT -connection $fgt -confirm:$false
         $DefaultFGTConnection | Should -Be $null
+    }
+
+    AfterAll {
+        #Remove script scope variable
+        Remove-Variable -name fgt -scope script
     }
 
 }
